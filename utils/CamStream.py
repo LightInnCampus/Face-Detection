@@ -16,7 +16,7 @@ class CamStream:
 		# be stopped
 		self.stopped = False
 
-		self.read_num=1
+		# self.read_num=1
 
 	def start(self):
 		# start the thread to read frames from the video stream
@@ -35,8 +35,8 @@ class CamStream:
 			# otherwise, read the next frame from the stream
 			(self.grabbed, self.frame) = self.stream.read()
 
-			print(f'Frame {self.read_num} readed')
-			self.read_num+=1
+			# print(f'Frame {self.read_num} readed')
+			# self.read_num+=1
             # TODO: do something here
 
 	def read(self):

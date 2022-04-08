@@ -9,19 +9,13 @@ import argparse
 import cv2
 
 def main(display_frame=1,src=0,resz = 0.6):
-    prev_frame = None
     vs = CamStream(src).start()
     fps = FPS().start()
     while True:
         # grab the frame from the threaded video stream and resize it
         # to have a maximum width of 400 pixels
         frame = vs.read()
-        if np.allclose(frame,prev_frame):
-            print("Get old frame")
-        else:
-            print("Get new frame")
-        prev_frame = frame
-        
+
         small_frame = cv2.resize(frame, (0, 0), fx=resz, fy=resz)
         # check to see if the frame should be displayed to our screen
         if display_frame > 0:
