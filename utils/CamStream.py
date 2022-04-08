@@ -21,7 +21,6 @@ class CamStream:
 	def start(self):
 		# start the thread to read frames from the video stream
 		t = Thread(target=self.update, name=self.name, args=())
-		# t.daemon = True
 		t.start()
 		return self
 
@@ -35,9 +34,6 @@ class CamStream:
 			# otherwise, read the next frame from the stream
 			(self.grabbed, self.frame) = self.stream.read()
 
-			# print(f'Frame {self.read_num} readed')
-			# self.read_num+=1
-            # TODO: do something here
 
 	def read(self):
 		# return the frame most recently read
