@@ -12,6 +12,8 @@ def show_frame_and_bb(frame,face_locations,face_names,resz=None):
     font = cv2.FONT_HERSHEY_DUPLEX
 
     for (top, right, bottom, left), name in zip(face_locations, face_names):
+        print(name)
+
         # Scale back up face locations 
         if resz:
             top = int(top/resz)
@@ -23,11 +25,11 @@ def show_frame_and_bb(frame,face_locations,face_names,resz=None):
         cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
         # Draw a label with a name below the face
         # cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), 1)
-        cv2.putText(frame, name, (left + 6, bottom - 6), font, 0.4, (255, 255, 255), 1)
+        cv2.putText(frame, str(name), (left + 6, bottom - 6), font, 0.4, (255, 255, 255), 1)
     cv2.imshow("Frame", frame)
 
 
-def main(display_frame=1,src=0,resz = 0.6,thres=0.4):
+def main(display_frame=1,src=0,resz = 0.6,thres=0.45):
     # Initiate and preprocess model
     frm = FaceRecModel(enc_model_size='small',frame_resz=resz,upsample=1,model='hog',num_jitters=1)
     frm.preprocess()

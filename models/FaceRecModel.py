@@ -34,7 +34,7 @@ class FaceRecModel:
             img = face_recognition.load_image_file(f)
             enc = self.get_encodings(img)[0]
             self.face_encs.append(enc)
-            self.face_names.append(re.split(r'[/.]',str(f))[1])
+            self.face_names.append((str(f).split('\\')[-1]).split('.')[0])
     
     def get_locations(self,frame):
         '''
