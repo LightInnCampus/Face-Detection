@@ -2,6 +2,7 @@
 import face_recognition
 from pathlib import Path
 import numpy as np
+import re
 
 DATA = Path('./Database/')
 class FaceRecModel:
@@ -29,10 +30,11 @@ class FaceRecModel:
         self.face_encs,self.face_names=[],[]
         files = [p for p in DATA.glob('**/*') if p.suffix in {'.png','.jpg','.jpeg'}]
         for f in files:
+            print(f'Get encodings from {f}')
             img = face_recognition.load_image_file(f)
             enc = self.get_encodings(img)[0]
             self.face_encs.append(enc)
-            self.face_names.append(img)
+            self.face_names.append(re.split(r'[/.]',str(f))[1])
     
     def get_locations(self,frame):
         '''
@@ -64,7 +66,7 @@ class FaceRecModel:
                 name = self.face_names[best_match_index]
 
             current_names.append(name)
-        
+
         return current_locations,current_names
 
 
