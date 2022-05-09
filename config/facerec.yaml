@@ -1,0 +1,10 @@
+Model:
+  enc_model_size: 'small'
+  upsample: 1
+  model: 'hog'
+  num_jitters: 1
+  thres: 0.45
+  enc_force_load: False
+
+Encodings:
+  enc_list: ''

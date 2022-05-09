@@ -1,11 +1,11 @@
 import cv2
-import numpy as np
 from utils.CamStream import CamStream
+from pathlib import Path
 from utils.FPS import FPS
 import argparse
 import cv2
 from models.FaceRecModel import FaceRecModel
-
+import yaml
 
 def show_frame_and_bb(frame,face_locations,face_names,resz=None):
     # show bounding box and names
@@ -27,13 +27,14 @@ def show_frame_and_bb(frame,face_locations,face_names,resz=None):
     cv2.imshow("Frame", frame)
 
 
-def main(display_frame=1,src=0,resz = 0.6,thres=0.45):
+def main(args,model_config):
     # Initiate and preprocess model
-    frm = FaceRecModel(enc_model_size='small',frame_resz=resz,upsample=1,model='hog',num_jitters=1)
-    frm.preprocess()
+    resz = args.framesize # resolution to downsize
+    frm = FaceRecModel(frame_resz = resz,**model_config)
+    frm.preprocess(args.enc_list)
 
     # start stream
-    vs = CamStream(src).start()
+    vs = CamStream(args.source).start()
     fps = FPS().start()
 
     while True:
@@ -43,11 +44,11 @@ def main(display_frame=1,src=0,resz = 0.6,thres=0.45):
         frame = cv2.resize(frame, (0, 0), fx=resz, fy=resz)
         
         # model predict
-        face_locations,face_names = frm.predict(frame,thres)
-        print(face_names)
+        face_locations,face_names = frm.predict(frame)
+        # print(face_names)
 
         # check to see if the frame should be displayed to our screen
-        if display_frame > 0:
+        if args.display > 0:
             show_frame_and_bb(frame_to_show,face_locations,face_names,resz=resz)
 
         fps.update()
@@ -71,8 +72,18 @@ if __name__=="__main__":
     ap.add_argument("-d", "--display", type=int, default=1,
         help="Whether or not frames should be displayed (1 or 0)")
     ap.add_argument("-s", "--source", type=int, default=0,
-        help="Webcam source (0 for first cam, 1 for second ...)")  
-    args = vars(ap.parse_args())
+        help="Webcam source (0 for first cam, 1 for second ...)")
+    ap.add_argument('-fs',"--framesize",type=float,default=0.6,
+        help="Frame resize ratio to original frame. To speed up process")
+    ap.add_argument("-c","--config", default="config/facerec.yaml",
+        help="Configuration file for model")
+    args = ap.parse_args()
 
-    display_frame,src = args.values()
-    main(display_frame,src,0.4)
+    # read yaml file for config
+    with open(str(Path(args.config))) as f:
+        config = yaml.safe_load(f)
+
+    for key in config:
+        for k,v in config[key].items(): setattr(args,k,v)
+
+    main(args,config['Model'])  
