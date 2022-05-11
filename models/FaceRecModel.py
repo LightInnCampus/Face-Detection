@@ -9,7 +9,8 @@ DATA = Path('./Database/')
 ENCODINGS = Path('./Weights/FaceRec_Encs/')
 
 class FaceRecModel:
-    def __init__(self,enc_model_size='large',frame_resz=0.2,upsample=1,model='hog',num_jitters=1,thres=0.4,enc_force_load=False):
+    def __init__(self,enc_model_size='large',frame_resz=0.2,upsample=1,
+                model='hog',num_jitters=1,thres=0.4,enc_force_load=False,frame_skip=0):
         self.enc_model_size= enc_model_size
         self.frame_resz=frame_resz
         
@@ -28,6 +29,9 @@ class FaceRecModel:
 
         self.thres = thres
         self.enc_force_load=enc_force_load
+
+        self.frame_count=0
+        self.frame_skip=frame_skip
 
     def preprocess(self,enc_list=[]):
         '''
@@ -107,22 +111,15 @@ class FaceRecModel:
 
         frame = frame[:,:,::-1] # to rgb
         current_locations = self.get_locations(frame)
-        current_encodings = self.get_encodings(frame,current_locations)
+        current_names=['']*len(current_locations)
 
-        current_names = []
-        # name="Unknown"
-        with ThreadPoolExecutor(max_workers=4) as executor:
-            current_names = executor.map(get_names_from_encodings,current_encodings)
+        if self.frame_count%self.frame_skip==0:
+            current_encodings = self.get_encodings(frame,current_locations)
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                current_names = executor.map(get_names_from_encodings,current_encodings)
 
-        # for enc in current_encodings:
-        #     face_distances = face_recognition.face_distance(self.face_encs, enc)
-        #     best_match_index = np.argmin(face_distances)
-        #     if face_distances[best_match_index]<=self.thres:
-        #         name = self.face_names[best_match_index]
-
-        #     current_names.append(name)
-
-        return current_locations,current_names
+        self.frame_count+=1
+        return current_locations,list(current_names)
 
 
 

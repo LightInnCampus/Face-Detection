@@ -217,10 +217,12 @@ def face_encodings(face_image, known_face_locations=None, num_jitters=1, model="
         return np.array(face_encoder.compute_face_descriptor(face_image, raw_landmark_set, num_jitters))
     
     raw_landmarks = _raw_face_landmarks(face_image, known_face_locations, model)
+    
     with ThreadPoolExecutor(max_workers=4) as executor:
         res = executor.map(compute_face_descriptor,raw_landmarks)
         # note: this will return a generator
     return res
+    # return []
     # return [np.array(face_encoder.compute_face_descriptor(face_image, raw_landmark_set, num_jitters)) for raw_landmark_set in raw_landmarks]
 
 def compare_faces(known_face_encodings, face_encoding_to_check, tolerance=0.6):
