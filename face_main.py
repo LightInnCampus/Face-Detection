@@ -45,11 +45,12 @@ def main(args,model_config):
         
         # model predict
         face_locations,face_names = frm.predict(frame)
-        # print(face_names)
+
 
         # check to see if the frame should be displayed to our screen
         if args.display > 0:
             show_frame_and_bb(frame_to_show,face_locations,face_names,resz=resz)
+            # show_frame_and_bb(frame_to_show,[(126, 205, 216, 116)],['whatever'],resz=resz)
 
         fps.update()
         if cv2.waitKey(1) & 0xFF == ord('q'):

@@ -3,9 +3,11 @@ import face_recognition
 from pathlib import Path
 import numpy as np
 import re
+from utils.facerec_utils import *
 
 DATA = Path('./Database/')
 ENCODINGS = Path('./Weights/FaceRec_Encs/')
+
 class FaceRecModel:
     def __init__(self,enc_model_size='large',frame_resz=0.2,upsample=1,model='hog',num_jitters=1,thres=0.4,enc_force_load=False):
         self.enc_model_size= enc_model_size
@@ -46,7 +48,7 @@ class FaceRecModel:
             for f in files:
                 print(f'Getting encodings from {f}...')
                 img = face_recognition.load_image_file(f)
-                enc = self.get_encodings(img)[0]
+                enc = list(self.get_encodings(img))[0]
                 name = Path(f).stem.lower()
 
                 # write to encoding directory
@@ -70,7 +72,7 @@ class FaceRecModel:
                     print(f'Error getting encodings for {name}: too many images or image not found')
                     continue
                 img = face_recognition.load_image_file(f[0])
-                enc = self.get_encodings(img)[0]
+                enc = list(self.get_encodings(img))[0]
                 # write to encoding directory
                 np.save(ENCODINGS/f'{name}.npy',enc)
                 self.face_encs.append(enc)
@@ -86,26 +88,39 @@ class FaceRecModel:
     def get_encodings(self,frame,locations=None):
         '''
         Return face encodings given frame and locations
+        The most time-consuming task
         '''
-        return face_recognition.face_encodings(frame,locations,model=self.enc_model_size,num_jitters = self.num_jitters)
+        return face_encodings(frame,locations,model=self.enc_model_size,num_jitters = self.num_jitters)
 
     def predict(self,frame):
         '''
         Lower threshold => stricter to get a face in encoding database
         '''
+
+        def get_names_from_encodings(enc):
+            name="Unknown"
+            face_distances = face_recognition.face_distance(self.face_encs, enc)
+            best_match_index = np.argmin(face_distances)
+            if face_distances[best_match_index]<=self.thres:
+                name = self.face_names[best_match_index]
+            return name
+
         frame = frame[:,:,::-1] # to rgb
         current_locations = self.get_locations(frame)
         current_encodings = self.get_encodings(frame,current_locations)
 
         current_names = []
-        name="Unknown"
-        for enc in current_encodings:
-            face_distances = face_recognition.face_distance(self.face_encs, enc)
-            best_match_index = np.argmin(face_distances)
-            if face_distances[best_match_index]<=self.thres:
-                name = self.face_names[best_match_index]
+        # name="Unknown"
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            current_names = executor.map(get_names_from_encodings,current_encodings)
 
-            current_names.append(name)
+        # for enc in current_encodings:
+        #     face_distances = face_recognition.face_distance(self.face_encs, enc)
+        #     best_match_index = np.argmin(face_distances)
+        #     if face_distances[best_match_index]<=self.thres:
+        #         name = self.face_names[best_match_index]
+
+        #     current_names.append(name)
 
         return current_locations,current_names
 
