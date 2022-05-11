@@ -71,7 +71,7 @@ def main(pre, dec):
 if __name__=="__main__":
     
     detector = dlib.get_frontal_face_detector()
-    predictor = dlib.shape_predictor('/home/harryphan/dev/LIC/project/Face-Recognition/sample/Eye-Blink-Detection/shape_predictor_68_face_landmarks.dat')
-
+    predictor = dlib.shape_predictor('Eye-Blink-Detection/shape_predictor_68_face_landmarks.dat')
+    
     main(predictor, detector)
 
