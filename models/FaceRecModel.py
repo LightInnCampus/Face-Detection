@@ -1,4 +1,5 @@
 
+from http.client import EXPECTATION_FAILED
 import face_recognition
 from pathlib import Path
 import numpy as np
@@ -32,6 +33,8 @@ class FaceRecModel:
 
         self.frame_count=0
         self.frame_skip=frame_skip
+
+        self.current_locations,self.current_names=[],[]
 
     def preprocess(self,enc_list=[]):
         '''

@@ -5,7 +5,7 @@ Model:
   num_jitters: 1
   thres: 0.43
   enc_force_load: False
-  frame_skip: 10
+  frame_skip: 15
 
 
 Encodings:

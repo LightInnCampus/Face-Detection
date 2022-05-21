@@ -1,6 +1,8 @@
 from multiprocessing import Pool, Queue
 import time
+from tracemalloc import stop
 import cv2
+from psutil import STATUS_STOPPED
 
 # intialize global variables for the pool processes:
 def init_pool(d_a,d_b):
@@ -10,9 +12,10 @@ def init_pool(d_a,d_b):
 
 
 def detect_object(frame):
-    time.sleep(2)
-    print('Calculation done')
-    pred_buffer.put(frame)
+    if frame is not None:
+        time.sleep(1)
+        print('Calculation done')
+        # pred_buffer.put(frame)
 
 
 def show():
@@ -46,10 +49,11 @@ if __name__ == "__main__":
             frame_buffer.put(frame)
             f_aresult = pool.apply_async(detect_object, args=(frame,))
             futures.append(f_aresult)
-            # time.sleep(0.001)
+            # time.sleep(0.02)
         else:
             break
     # wait for all the frame-putting tasks to complete:
+    print('Program ending...')
     for f in futures:
         f.get() # Return the result when it arrives
 
