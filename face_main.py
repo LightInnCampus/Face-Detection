@@ -30,8 +30,8 @@ def show_frame_and_bb(frame,face_locations,face_names,resz=None):
 
 def main(args,model_config):
     # Initiate and preprocess model
-    resz = args.framesize # resolution to downsize
-    frm = FaceRecModel(frame_resz = resz,**model_config)
+    resz = args.frame_resz # resolution to downsize
+    frm = FaceRecModel(**model_config)
     frm.preprocess(args.enc_list)
 
     # start stream
@@ -80,8 +80,6 @@ if __name__=="__main__":
         help="Whether or not frames should be displayed (1 or 0)")
     ap.add_argument("-s", "--source", type=int, default=0,
         help="Webcam source (0 for first cam, 1 for second ...)")
-    ap.add_argument('-fs',"--framesize",type=float,default=0.8,
-        help="Frame resize ratio to original frame. To speed up process")
     ap.add_argument("-c","--config", default="config/facerec.yaml",
         help="Configuration file for model")
     args = ap.parse_args()

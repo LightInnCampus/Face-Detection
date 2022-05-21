@@ -61,13 +61,15 @@ def predict_async(frame,frm=None,frame_count=0):
     try:
         if frame is not None:
             frame_rsz = cv2.resize(frame, (0, 0), fx=frm.frame_resz, fy=frm.frame_resz)
-            current_names=[]
+            current_locations,current_names=[],[]
             current_locations = face_locations(frame_rsz,number_of_times_to_upsample=frm.upsample,model=frm.model)
             
             if len(current_locations):
                 if frame_count % frm.frame_skip==0:
                     current_encodings = face_encodings(frame_rsz,current_locations,model=frm.enc_model_size,num_jitters = frm.num_jitters)
                     current_names = [get_names_from_encodings(enc,frm) for enc in current_encodings]
+                    print(current_names)
+                    print('-'*10)
                 # with ThreadPoolExecutor(max_workers=4) as executor:
                 #     current_names = executor.map(get_names_from_encodings,current_encodings)
                 PRED_BUFFER.put((current_locations,current_names))
@@ -82,9 +84,9 @@ def main(args,model_config):
 
     frame_count=0
     # Initiate and preprocess model
-    resz = args.framesize # resolution to downsize
+    resz = args.frame_resz # resolution to downsize
 
-    frm = FaceRecModel(frame_resz = resz,**model_config)
+    frm = FaceRecModel(**model_config)
     frm.preprocess(args.enc_list)
 
 
@@ -104,7 +106,7 @@ def main(args,model_config):
             aresult = pools.apply_async(predict_async,args=(frame,frm,frame_count))
             async_result_list.append(aresult)
             frame_count+=1
-            if frame_count > frm.frame_skip*10:
+            if frame_count > 1000:
                 frame_count=0
         else: 
             break
@@ -127,8 +129,6 @@ if __name__=="__main__":
         help="Whether or not frames should be displayed (1 or 0)")
     ap.add_argument("-s", "--source", type=int, default=0,
         help="Webcam source (0 for first cam, 1 for second ...)")
-    ap.add_argument('-fs',"--framesize",type=float,default=0.8,
-        help="Frame resize ratio to original frame. To speed up process")
     ap.add_argument("-c","--config", default="config/facerec.yaml",
         help="Configuration file for model")
     args = ap.parse_args()
