@@ -87,7 +87,7 @@ class FaceRecModel:
         Return locations of faces from 1 single frame
         
         '''
-        return face_recognition.face_locations(frame,number_of_times_to_upsample=self.upsample,model=self.model)
+        return face_locations(frame,number_of_times_to_upsample=self.upsample,model=self.model)
     
     def get_encodings(self,frame,locations=None):
         '''
@@ -110,15 +110,41 @@ class FaceRecModel:
             return name
 
         frame = frame[:,:,::-1] # to rgb
+    # upsample=1:
+        # no get_locations: 202.25, with eye blink: 16.2
+        # with get_locations : 
+        #   no face: 12.6
+        #   with face: 12.46, with eye blink: 8.65
+        #  => massive reduction when adding get_locations
+        #  => not much difference b/t with and without face.
+    # upsample=0:
+        # no get_locations: 277, with eye blink: 15
+        # with get_locations 
+        #   no face: 27.05
+        #   with face: 28.6, with eye blink: 13.9
+        # => >50% improvement with upsample 0
+
+        # current_locations,current_names=[],[]
+        # if self.frame_count%self.frame_skip==0:
+        #     current_locations = self.get_locations(frame)
+        #     if len(current_locations):
+        #         current_encodings = self.get_encodings(frame,current_locations)
+        #         # current_names = [get_names_from_encodings(enc) for enc in current_encodings]
+        #         with ThreadPoolExecutor(max_workers=4) as executor:
+        #             current_names = executor.map(get_names_from_encodings,current_encodings)
+
+        current_names=[]
         current_locations = self.get_locations(frame)
-        current_names=['']*len(current_locations)
 
         if self.frame_count%self.frame_skip==0:
-            current_encodings = self.get_encodings(frame,current_locations)
-            with ThreadPoolExecutor(max_workers=4) as executor:
-                current_names = executor.map(get_names_from_encodings,current_encodings)
+            if len(current_locations):
+                current_encodings = self.get_encodings(frame,current_locations)
+                with ThreadPoolExecutor(max_workers=4) as executor:
+                    current_names = executor.map(get_names_from_encodings,current_encodings)
 
         self.frame_count+=1
+        if self.frame_count>=self.frame_skip*10:
+            self.frame_count=0
         return current_locations,list(current_names)
 
 

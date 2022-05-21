@@ -6,6 +6,7 @@ import argparse
 import cv2
 from models.FaceRecModel import FaceRecModel
 import yaml
+from utils.util import are_eyes_closed
 
 def show_frame_and_bb(frame,face_locations,face_names,resz=None):
     # show bounding box and names
@@ -41,11 +42,16 @@ def main(args,model_config):
         # grab the frame from the threaded video stream and resize it
         frame = vs.read()
         frame_to_show = frame.copy()
+
+        # detect eyes closed
+        # _ = are_eyes_closed(frame.copy())
+
         frame = cv2.resize(frame, (0, 0), fx=resz, fy=resz)
-        
+    
         # model predict
         face_locations,face_names = frm.predict(frame)
-        print(f'Face predicted: {face_names}')
+        if len(face_names):
+            print(f'Face predicted: {face_names}')
         # check to see if the frame should be displayed to our screen
         if args.display > 0:
             show_frame_and_bb(frame_to_show,face_locations,face_names,resz=resz)
@@ -74,7 +80,7 @@ if __name__=="__main__":
         help="Whether or not frames should be displayed (1 or 0)")
     ap.add_argument("-s", "--source", type=int, default=0,
         help="Webcam source (0 for first cam, 1 for second ...)")
-    ap.add_argument('-fs',"--framesize",type=float,default=0.6,
+    ap.add_argument('-fs',"--framesize",type=float,default=0.8,
         help="Frame resize ratio to original frame. To speed up process")
     ap.add_argument("-c","--config", default="config/facerec.yaml",
         help="Configuration file for model")
