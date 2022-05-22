@@ -1,11 +1,12 @@
 Model:
   enc_model_size: 'large'
-  upsample: 1
+  upsample: 0
   model: 'hog'
   num_jitters: 1
-  thres: 0.45
+  thres: 0.43
   enc_force_load: False
-  frame_skip: 8
+  frame_skip: 15
+  frame_resz: 0.85
 
 
 Encodings:
