@@ -1,13 +1,11 @@
 from functools import partial
 import cv2
-# from utils.CamStream import CamStream
 from pathlib import Path
-from utils.FPS import FPS
 import argparse
 import cv2
 from models.FaceRecModel import FaceRecModel
 import yaml
-from utils.util import are_eyes_closed
+# from utils.util import are_eyes_closed
 from multiprocessing import Pool, Queue
 import time
 from utils.facerec_utils import *
@@ -67,11 +65,12 @@ def predict_async(frame,frm=None,frame_count=0):
             if len(current_locations):
                 if frame_count % frm.frame_skip==0:
                     current_encodings = face_encodings(frame_rsz,current_locations,model=frm.enc_model_size,num_jitters = frm.num_jitters)
-                    current_names = [get_names_from_encodings(enc,frm) for enc in current_encodings]
+                    # current_names = [get_names_from_encodings(enc,frm) for enc in current_encodings]
+                    with ThreadPoolExecutor(max_workers=4) as executor:
+                        current_names = executor.map(partial(get_names_from_encodings,frm=frm),current_encodings)
+                    current_names = list(current_names)
                     print(current_names)
                     print('-'*10)
-                # with ThreadPoolExecutor(max_workers=4) as executor:
-                #     current_names = executor.map(get_names_from_encodings,current_encodings)
                 PRED_BUFFER.put((current_locations,current_names))
 
     except Exception as e:
