@@ -10,13 +10,14 @@ from multiprocessing import Pool, Queue
 from datetime import datetime
 import pytz
 from utils.facerec_utils import *
+from collections import defaultdict
 
 # https://stackoverflow.com/questions/67567464/multi-threading-in-image-processing-video-python-opencv
 def init_pool(d_a,d_b,d_c):
     global FRAME_BUFFER
     global PRED_BUFFER
     global NAME_BUFFER
-    FRAME_BUFFER,PRED_BUFFER = d_a,d_b,d_c
+    FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER = d_a,d_b,d_c
 
 def show_frame_and_bb(resz):
     while True:
@@ -25,6 +26,9 @@ def show_frame_and_bb(resz):
             # show bounding box and names
             font = cv2.FONT_HERSHEY_DUPLEX
             if not PRED_BUFFER.empty():
+                # name_list = list(NAME_BUFFER.queue)
+                # print(f'Show list: {name_list}')
+
                 face_locations,face_names = PRED_BUFFER.get()
 
                 for (top, right, bottom, left) in face_locations:
@@ -58,6 +62,36 @@ def get_names_from_encodings(enc,frm):
         
     return name,date_now
 
+def get_single_prediction(maxsize,thres):
+    name_list=[]
+
+    name_freq = defaultdict(int)
+    date_dict = {}
+
+    max_freq=0
+    max_name=''
+
+    while not NAME_BUFFER.empty():
+        name_list.append(NAME_BUFFER.get())
+    
+    if len(name_list) >= maxsize: # check only when max size is reached
+        for n,t in name_list:
+            name_freq[n]+=1
+            if n not in date_dict: date_dict[n]=t # save first appearance moment
+            if name_freq[n]>max_freq:
+                max_freq = name_freq[n]
+                max_name = n
+
+
+    if max_name.lower() in ['','unknown'] or max_freq < thres-1:
+        for tu in name_list:
+            NAME_BUFFER.put(tu)
+        return None,None
+
+    # there's a prediction => remove everything from BUFFER (by not putting things back)
+    return max_name,date_dict[max_name]
+
+        
 
 
 def predict_async(frame,frm=None,frame_count=0):
@@ -65,7 +99,7 @@ def predict_async(frame,frm=None,frame_count=0):
         if frame is not None:
             frame_rsz = cv2.resize(frame, (0, 0), fx=frm.frame_resz, fy=frm.frame_resz)
             current_locations,current_names=[],[]
-            # FIXED: get locations every 2 frames
+            # get locations every 2 frames
             if frame_count % 2 ==0:
                 current_locations = face_locations(frame_rsz,number_of_times_to_upsample=frm.upsample,model=frm.model)
             
@@ -76,9 +110,21 @@ def predict_async(frame,frm=None,frame_count=0):
                     with ThreadPoolExecutor(max_workers=4) as executor:
                         current_names = executor.map(partial(get_names_from_encodings,frm=frm),current_encodings)
                     current_names = list(current_names)
-                    print(current_names)
-                    print('-'*10)
+                    # print(current_names)
+                    
                 PRED_BUFFER.put((current_locations,current_names))
+                if len(current_names):
+                    if NAME_BUFFER.full():
+                        # get rid of oldest item
+                        _ = NAME_BUFFER.get()
+                    # put new item
+                    for n in current_names:
+                        NAME_BUFFER.put(n)
+                    
+                    pred_name,pred_time = get_single_prediction(maxsize=4,thres=3)
+                    if pred_name is not None:
+                        print(f'Name: {pred_name}, Time: {pred_time}')
+
 
     except Exception as e:
         print('Something wrong')
@@ -96,8 +142,8 @@ def main(args,model_config):
     frm.preprocess(args.enc_list)
 
 
-    FRAME_BUFFER,PRED_BUFFER = Queue(),Queue()
-    pools = Pool(None, initializer=init_pool, initargs=(FRAME_BUFFER,PRED_BUFFER))
+    FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER = Queue(),Queue(),Queue(maxsize=5)
+    pools = Pool(None, initializer=init_pool, initargs=(FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER))
     
     # showing frame on 1 pool
     show_frame_aresult = pools.apply_async(show_frame_and_bb,args=(resz,))

@@ -6,7 +6,7 @@ Model:
   thres: 0.43
   enc_force_load: False
   frame_skip: 12
-  frame_resz: 0.77
+  frame_resz: 0.8
 
 
 Encodings:
