@@ -13,11 +13,12 @@ from utils.facerec_utils import *
 from collections import defaultdict
 
 # https://stackoverflow.com/questions/67567464/multi-threading-in-image-processing-video-python-opencv
-def init_pool(d_a,d_b,d_c):
+def init_pool(d_a,d_b,d_c,d_e):
     global FRAME_BUFFER
     global PRED_BUFFER
     global NAME_BUFFER
-    FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER = d_a,d_b,d_c
+    global SHOW_BUFFER
+    FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER,SHOW_BUFFER = d_a,d_b,d_c,d_e
 
 def show_frame_and_bb(resz):
     while True:
@@ -26,9 +27,6 @@ def show_frame_and_bb(resz):
             # show bounding box and names
             font = cv2.FONT_HERSHEY_DUPLEX
             if not PRED_BUFFER.empty():
-                # name_list = list(NAME_BUFFER.queue)
-                # print(f'Show list: {name_list}')
-
                 face_locations,face_names = PRED_BUFFER.get()
 
                 for (top, right, bottom, left) in face_locations:
@@ -42,8 +40,12 @@ def show_frame_and_bb(resz):
                     cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
                     # Draw a label with a name below the face
                     # cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), 1)
-                for i,(n,t) in enumerate(face_names):
-                    cv2.putText(frame, f"Welcome {n} at {t}", (4, 20+ i*15), font, 0.6, (0, 0, 0), 1)
+                # for i,(n,t) in enumerate(face_names):
+                #     cv2.putText(frame, f"Welcome {n} at {t}", (4, 20+ i*15), font, 0.6, (0, 0, 0), 1)
+            
+            # if not SHOW_BUFFER.empty():
+            #     show_name,show_time = SHOW_BUFFER.get()
+            #     cv2.putText(frame, f"Welcome {show_name}, checking in at {show_time}", (4, 20), font, 0.6, (0, 0, 0), 1)
             cv2.imshow("Frame", frame)
         else:
             break
@@ -94,7 +96,7 @@ def get_single_prediction(maxsize,thres):
         
 
 
-def predict_async(frame,frm=None,frame_count=0):
+def predict_async(frame,frm=None,args=None,frame_count=0):
     try:
         if frame is not None:
             frame_rsz = cv2.resize(frame, (0, 0), fx=frm.frame_resz, fy=frm.frame_resz)
@@ -117,12 +119,13 @@ def predict_async(frame,frm=None,frame_count=0):
                     if NAME_BUFFER.full():
                         # get rid of oldest item
                         _ = NAME_BUFFER.get()
-                    # put new item
+                    # put new item in
                     for n in current_names:
                         NAME_BUFFER.put(n)
                     
-                    pred_name,pred_time = get_single_prediction(maxsize=4,thres=3)
+                    pred_name,pred_time = get_single_prediction(args.max_size,args.min_pred)
                     if pred_name is not None:
+                        # SHOW_BUFFER.put((pred_name,pred_time))
                         print(f'Name: {pred_name}, Time: {pred_time}')
 
 
@@ -142,11 +145,13 @@ def main(args,model_config):
     frm.preprocess(args.enc_list)
 
 
-    FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER = Queue(),Queue(),Queue(maxsize=5)
-    pools = Pool(None, initializer=init_pool, initargs=(FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER))
+    FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER,SHOW_BUFFER = Queue(),Queue(),Queue(maxsize=args.max_size),Queue()
+    pools = Pool(None, initializer=init_pool, initargs=(FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER,SHOW_BUFFER))
     
     # showing frame on 1 pool
     show_frame_aresult = pools.apply_async(show_frame_and_bb,args=(resz,))
+    
+    # write/read 
 
     stream = cv2.VideoCapture(args.source)
     async_result_list=[]
@@ -155,7 +160,8 @@ def main(args,model_config):
         ret,frame = stream.read()
         if ret:
             FRAME_BUFFER.put(frame)
-            aresult = pools.apply_async(predict_async,args=(frame,frm,frame_count))
+            # make prediction using the rest of the pools
+            aresult = pools.apply_async(predict_async,args=(frame,frm,args,frame_count))
             async_result_list.append(aresult)
             frame_count+=1
             if frame_count > 1000:

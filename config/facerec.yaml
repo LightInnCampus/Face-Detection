@@ -11,3 +11,7 @@ Model:
 
 Encodings:
   enc_list: ''
+
+Predictions:
+  max_size: 4
+  min_pred: 3
