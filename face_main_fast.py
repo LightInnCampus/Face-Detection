@@ -13,12 +13,18 @@ from utils.facerec_utils import *
 from collections import defaultdict
 
 # https://stackoverflow.com/questions/67567464/multi-threading-in-image-processing-video-python-opencv
-def init_pool(d_a,d_b,d_c,d_e):
+# def init_pool(d_a,d_b,d_c,d_e,d_f):
+#     global FRAME_BUFFER
+#     global PRED_BUFFER
+#     global NAME_BUFFER
+#     global CURRENT_PRED
+#     global PREV_PRED
+#     FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER,CURRENT_PRED,PREV_PRED = d_a,d_b,d_c,d_e,d_f
+def init_pool(d_a,d_b,d_c):
     global FRAME_BUFFER
     global PRED_BUFFER
     global NAME_BUFFER
-    global SHOW_BUFFER
-    FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER,SHOW_BUFFER = d_a,d_b,d_c,d_e
+    FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER = d_a,d_b,d_c
 
 def show_frame_and_bb(resz):
     while True:
@@ -43,9 +49,10 @@ def show_frame_and_bb(resz):
                 # for i,(n,t) in enumerate(face_names):
                 #     cv2.putText(frame, f"Welcome {n} at {t}", (4, 20+ i*15), font, 0.6, (0, 0, 0), 1)
             
-            # if not SHOW_BUFFER.empty():
-            #     show_name,show_time = SHOW_BUFFER.get()
-            #     cv2.putText(frame, f"Welcome {show_name}, checking in at {show_time}", (4, 20), font, 0.6, (0, 0, 0), 1)
+            # current_name,current_time = read_singlevalue_queue(CURRENT_PRED)
+            current_name='hihi'
+            current_time='haha'
+            cv2.putText(frame, f"Welcome {current_name}, checking in at {current_time}", (4, 20), font, 0.6, (0, 0, 0), 1)
             cv2.imshow("Frame", frame)
         else:
             break
@@ -86,6 +93,7 @@ def get_single_prediction(maxsize,thres):
 
 
     if max_name.lower() in ['','unknown'] or max_freq < thres-1:
+        # no prediction made yet, add stuff back to queue
         for tu in name_list:
             NAME_BUFFER.put(tu)
         return None,None
@@ -93,7 +101,18 @@ def get_single_prediction(maxsize,thres):
     # there's a prediction => remove everything from BUFFER (by not putting things back)
     return max_name,date_dict[max_name]
 
-        
+
+def read_singlevalue_queue(q):
+    result=None
+    if not q.empty():
+        result = q.get()
+        q.put(result)
+    return result
+    
+def write_singlevalue_queue(q,new_value):
+    while not q.empty():
+        _ = q.get()
+    q.put(new_value)
 
 
 def predict_async(frame,frm=None,args=None,frame_count=0):
@@ -103,11 +122,15 @@ def predict_async(frame,frm=None,args=None,frame_count=0):
             current_locations,current_names=[],[]
             # get locations every 2 frames
             if frame_count % 2 ==0:
-                current_locations = face_locations(frame_rsz,number_of_times_to_upsample=frm.upsample,model=frm.model)
+                current_locations = face_locations(frame_rsz,
+                                                    number_of_times_to_upsample=frm.upsample,
+                                                    model=frm.model)
             
             if len(current_locations):
                 if frame_count % frm.frame_skip==0:
-                    current_encodings = face_encodings(frame_rsz,current_locations,model=frm.enc_model_size,num_jitters = frm.num_jitters)
+                    current_encodings = face_encodings(frame_rsz,current_locations,
+                                                        model=frm.enc_model_size,
+                                                        num_jitters = frm.num_jitters)
                     # current_names = [get_names_from_encodings(enc,frm) for enc in current_encodings]
                     with ThreadPoolExecutor(max_workers=4) as executor:
                         current_names = executor.map(partial(get_names_from_encodings,frm=frm),current_encodings)
@@ -115,6 +138,7 @@ def predict_async(frame,frm=None,args=None,frame_count=0):
                     # print(current_names)
                     
                 PRED_BUFFER.put((current_locations,current_names))
+
                 if len(current_names):
                     if NAME_BUFFER.full():
                         # get rid of oldest item
@@ -125,7 +149,7 @@ def predict_async(frame,frm=None,args=None,frame_count=0):
                     
                     pred_name,pred_time = get_single_prediction(args.max_size,args.min_pred)
                     if pred_name is not None:
-                        # SHOW_BUFFER.put((pred_name,pred_time))
+                        # write_singlevalue_queue(CURRENT_PRED,(pred_name,pred_time))
                         print(f'Name: {pred_name}, Time: {pred_time}')
 
 
@@ -144,15 +168,18 @@ def main(args,model_config):
     frm = FaceRecModel(**model_config)
     frm.preprocess(args.enc_list)
 
+    # FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER,CURRENT_PRED,PREV_PRED = Queue(),Queue(),Queue(maxsize=args.max_size),Queue(),Queue()
+    # pools = Pool(None, initializer=init_pool, initargs=(FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER,CURRENT_PRED,PREV_PRED))
 
-    FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER,SHOW_BUFFER = Queue(),Queue(),Queue(maxsize=args.max_size),Queue()
-    pools = Pool(None, initializer=init_pool, initargs=(FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER,SHOW_BUFFER))
+    FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER= Queue(),Queue(),Queue(maxsize=args.max_size)
+    pools = Pool(None, initializer=init_pool, initargs=(FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER))
     
     # showing frame on 1 pool
     show_frame_aresult = pools.apply_async(show_frame_and_bb,args=(resz,))
     
     # write/read 
 
+    # camera stream
     stream = cv2.VideoCapture(args.source)
     async_result_list=[]
 
@@ -183,8 +210,6 @@ def main(args,model_config):
 if __name__=="__main__":
     # construct the argument parse and parse the arguments
     ap = argparse.ArgumentParser()
-    ap.add_argument("-d", "--display", type=int, default=1,
-        help="Whether or not frames should be displayed (1 or 0)")
     ap.add_argument("-s", "--source", type=int, default=0,
         help="Webcam source (0 for first cam, 1 for second ...)")
     ap.add_argument("-c","--config", default="config/facerec.yaml",
