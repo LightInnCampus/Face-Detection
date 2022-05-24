@@ -13,18 +13,13 @@ from utils.facerec_utils import *
 from collections import defaultdict
 
 # https://stackoverflow.com/questions/67567464/multi-threading-in-image-processing-video-python-opencv
-# def init_pool(d_a,d_b,d_c,d_e,d_f):
-#     global FRAME_BUFFER
-#     global PRED_BUFFER
-#     global NAME_BUFFER
-#     global CURRENT_PRED
-#     global PREV_PRED
-#     FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER,CURRENT_PRED,PREV_PRED = d_a,d_b,d_c,d_e,d_f
-def init_pool(d_a,d_b,d_c):
+def init_pool(d_a,d_b,d_c,d_d):
     global FRAME_BUFFER
     global PRED_BUFFER
     global NAME_BUFFER
-    FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER = d_a,d_b,d_c
+    global CURRENT_PRED
+    FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER,CURRENT_PRED = d_a,d_b,d_c,d_d
+
 
 def show_frame_and_bb(resz):
     while True:
@@ -46,12 +41,9 @@ def show_frame_and_bb(resz):
                     cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
                     # Draw a label with a name below the face
                     # cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), 1)
-                # for i,(n,t) in enumerate(face_names):
-                #     cv2.putText(frame, f"Welcome {n} at {t}", (4, 20+ i*15), font, 0.6, (0, 0, 0), 1)
             
-            # current_name,current_time = read_singlevalue_queue(CURRENT_PRED)
-            current_name='hihi'
-            current_time='haha'
+            current_name,current_time = read_singlevalue_queue(CURRENT_PRED)
+
             cv2.putText(frame, f"Welcome {current_name}, checking in at {current_time}", (4, 20), font, 0.6, (0, 0, 0), 1)
             cv2.imshow("Frame", frame)
         else:
@@ -103,7 +95,7 @@ def get_single_prediction(maxsize,thres):
 
 
 def read_singlevalue_queue(q):
-    result=None
+    result=('','')
     if not q.empty():
         result = q.get()
         q.put(result)
@@ -114,7 +106,14 @@ def write_singlevalue_queue(q,new_value):
         _ = q.get()
     q.put(new_value)
 
-
+def update_dequeue(q,values):
+    if q.full():
+        # get rid of oldest
+        _ = q.get()
+    # put new item in
+    for n in values:
+        q.put(n)
+    
 def predict_async(frame,frm=None,args=None,frame_count=0):
     try:
         if frame is not None:
@@ -135,21 +134,15 @@ def predict_async(frame,frm=None,args=None,frame_count=0):
                     with ThreadPoolExecutor(max_workers=4) as executor:
                         current_names = executor.map(partial(get_names_from_encodings,frm=frm),current_encodings)
                     current_names = list(current_names)
-                    # print(current_names)
                     
                 PRED_BUFFER.put((current_locations,current_names))
 
                 if len(current_names):
-                    if NAME_BUFFER.full():
-                        # get rid of oldest item
-                        _ = NAME_BUFFER.get()
-                    # put new item in
-                    for n in current_names:
-                        NAME_BUFFER.put(n)
+                    update_dequeue(NAME_BUFFER,current_names)
                     
                     pred_name,pred_time = get_single_prediction(args.max_size,args.min_pred)
                     if pred_name is not None:
-                        # write_singlevalue_queue(CURRENT_PRED,(pred_name,pred_time))
+                        write_singlevalue_queue(CURRENT_PRED,(pred_name,pred_time))
                         print(f'Name: {pred_name}, Time: {pred_time}')
 
 
@@ -168,14 +161,11 @@ def main(args,model_config):
     frm = FaceRecModel(**model_config)
     frm.preprocess(args.enc_list)
 
-    # FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER,CURRENT_PRED,PREV_PRED = Queue(),Queue(),Queue(maxsize=args.max_size),Queue(),Queue()
-    # pools = Pool(None, initializer=init_pool, initargs=(FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER,CURRENT_PRED,PREV_PRED))
-
-    FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER= Queue(),Queue(),Queue(maxsize=args.max_size)
-    pools = Pool(None, initializer=init_pool, initargs=(FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER))
+    FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER,CURRENT_PRED = Queue(),Queue(),Queue(maxsize=args.max_size),Queue()
+    pools = Pool(None, initializer=init_pool, initargs=(FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER,CURRENT_PRED))
     
     # showing frame on 1 pool
-    show_frame_aresult = pools.apply_async(show_frame_and_bb,args=(resz,))
+    show_frame_aresult = pools.apply_async(show_frame_and_bb,args=(resz,)) # remember to have the comma here
     
     # write/read 
 
