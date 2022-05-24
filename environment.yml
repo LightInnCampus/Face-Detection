@@ -9,4 +9,5 @@ dependencies:
     - opencv-python==4.5.5.64
     - pyyaml==6.0
     - fastcore==3.0.8
+    - pytz==2022.1
 

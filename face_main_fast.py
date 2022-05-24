@@ -7,7 +7,8 @@ from models.FaceRecModel import FaceRecModel
 import yaml
 # from utils.util import are_eyes_closed
 from multiprocessing import Pool, Queue
-import time
+from datetime import datetime
+import pytz
 from utils.facerec_utils import *
 
 # https://stackoverflow.com/questions/67567464/multi-threading-in-image-processing-video-python-opencv
@@ -51,6 +52,7 @@ def get_names_from_encodings(enc,frm):
     best_match_index = np.argmin(face_distances)
     if face_distances[best_match_index]<=frm.thres:
         name = frm.face_names[best_match_index]
+    
     return name
 
 
