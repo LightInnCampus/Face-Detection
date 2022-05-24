@@ -37,8 +37,8 @@ def show_frame_and_bb(resz):
                     cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
                     # Draw a label with a name below the face
                     # cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), 1)
-
-                cv2.putText(frame, f"Welcome {', '.join(face_names)}", (4, 20), font, 0.6, (0, 0, 0), 1)
+                for i,(n,t) in enumerate(face_names):
+                    cv2.putText(frame, f"Welcome {n} at {t}", (4, 20+ i*15), font, 0.6, (0, 0, 0), 1)
             cv2.imshow("Frame", frame)
         else:
             break
@@ -48,12 +48,14 @@ def show_frame_and_bb(resz):
 
 def get_names_from_encodings(enc,frm):
     name="Unknown"
+    dt_HCM = datetime.now(pytz.timezone('Asia/Ho_Chi_Minh'))
+    date_now = dt_HCM.strftime("%Y-%m-%d %H:%M:%S")
     face_distances = face_distance(frm.face_encs, enc)
     best_match_index = np.argmin(face_distances)
     if face_distances[best_match_index]<=frm.thres:
         name = frm.face_names[best_match_index]
-    
-    return name
+        
+    return name,date_now
 
 
 
