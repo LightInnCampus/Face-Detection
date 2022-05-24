@@ -12,10 +12,11 @@ import pytz
 from utils.facerec_utils import *
 
 # https://stackoverflow.com/questions/67567464/multi-threading-in-image-processing-video-python-opencv
-def init_pool(d_a,d_b):
+def init_pool(d_a,d_b,d_c):
     global FRAME_BUFFER
     global PRED_BUFFER
-    FRAME_BUFFER,PRED_BUFFER = d_a,d_b
+    global NAME_BUFFER
+    FRAME_BUFFER,PRED_BUFFER = d_a,d_b,d_c
 
 def show_frame_and_bb(resz):
     while True:
@@ -64,7 +65,9 @@ def predict_async(frame,frm=None,frame_count=0):
         if frame is not None:
             frame_rsz = cv2.resize(frame, (0, 0), fx=frm.frame_resz, fy=frm.frame_resz)
             current_locations,current_names=[],[]
-            current_locations = face_locations(frame_rsz,number_of_times_to_upsample=frm.upsample,model=frm.model)
+            # FIXED: get locations every 2 frames
+            if frame_count % 2 ==0:
+                current_locations = face_locations(frame_rsz,number_of_times_to_upsample=frm.upsample,model=frm.model)
             
             if len(current_locations):
                 if frame_count % frm.frame_skip==0:
