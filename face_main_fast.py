@@ -6,19 +6,23 @@ import cv2
 from models.FaceRecModel import FaceRecModel
 import yaml
 # from utils.util import are_eyes_closed
-from multiprocessing import Pool, Queue
+from multiprocessing import Pool, Queue, Lock
 from datetime import datetime
 import pytz
 from utils.facerec_utils import *
 from collections import defaultdict
+import gspread
+from google.oauth2.service_account import Credentials
+
 
 # https://stackoverflow.com/questions/67567464/multi-threading-in-image-processing-video-python-opencv
-def init_pool(d_a,d_b,d_c,d_d):
+def init_pool(d_a,d_b,d_c,d_d,d_e):
     global FRAME_BUFFER
     global PRED_BUFFER
     global NAME_BUFFER
-    global CURRENT_PRED
-    FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER,CURRENT_PRED = d_a,d_b,d_c,d_d
+    global CURRENT_PRED # to show on screen
+    global FINAL_PREDS
+    FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER,CURRENT_PRED,FINAL_PREDS = d_a,d_b,d_c,d_d,d_e
 
 
 def show_frame_and_bb(resz):
@@ -52,6 +56,46 @@ def show_frame_and_bb(resz):
             break
     return
 
+def write_to_sheet(grace_minutes=5):
+    print('write_to_sheet run')
+    try:
+        if FINAL_PREDS.empty():
+            return
+
+        date_format_str = '%H:%M:%S'
+        
+        current_name,current_time = FINAL_PREDS.get()
+        current_day,current_timestamp = current_time.split()
+        credentials = Credentials.from_service_account_file(str(Path("./credentials/lic_face_rec.json")),
+                scopes=['https://www.googleapis.com/auth/spreadsheets','https://www.googleapis.com/auth/drive'])
+        ss_obj = gspread.authorize(credentials)
+        # most time consuming
+        ss = ss_obj.open('attendance')
+
+        all_wsheets = [ws.title for ws in ss.worksheets()]
+        if current_day not in all_wsheets:
+            # create new sheet for the day
+            ss.add_worksheet(title=current_day,rows="1",cols="3")
+            tmp = ss.worksheet(current_day)
+            tmp.insert_row(['ID','Check-in Time','Day'],1)
+        
+        sheet = ss.worksheet(current_day)
+        checkin_times = sheet.col_values(2)
+        names = sheet.col_values(1)
+        l = len(checkin_times)
+
+        for t,n in zip(checkin_times[-1:],names[-1:]):
+            if n==current_name:
+                time_delt = (datetime.strptime(current_timestamp,date_format_str) - datetime.strptime(t,date_format_str)).total_seconds()/60
+                if time_delt < grace_minutes:
+                    return
+                break
+        sheet.insert_row([current_name,current_timestamp,current_day],l+1)
+
+    except Exception as e:
+        print('Something wrong in writing to sheet')
+        print(f'{e}')
+
 def get_names_from_encodings(enc,frm):
     name="Unknown"
     dt_HCM = datetime.now(pytz.timezone('Asia/Ho_Chi_Minh'))
@@ -63,7 +107,7 @@ def get_names_from_encodings(enc,frm):
         
     return name,date_now
 
-def get_single_prediction(maxsize,thres):
+def get_single_prediction(q,maxsize,thres):
     name_list=[]
 
     name_freq = defaultdict(int)
@@ -72,13 +116,13 @@ def get_single_prediction(maxsize,thres):
     max_freq=0
     max_name=''
 
-    while not NAME_BUFFER.empty():
-        name_list.append(NAME_BUFFER.get())
+    while not q.empty():
+        name_list.append(q.get())
     
     if len(name_list) >= maxsize: # check only when max size is reached
         for n,t in name_list:
             name_freq[n]+=1
-            if n not in date_dict: date_dict[n]=t # save first appearance moment
+            if n not in date_dict: date_dict[n]=t # save datetime of first appearance
             if name_freq[n]>max_freq:
                 max_freq = name_freq[n]
                 max_name = n
@@ -87,7 +131,7 @@ def get_single_prediction(maxsize,thres):
     if max_name.lower() in ['','unknown'] or max_freq < thres-1:
         # no prediction made yet, add stuff back to queue
         for tu in name_list:
-            NAME_BUFFER.put(tu)
+            q.put(tu)
         return None,None
 
     # there's a prediction => remove everything from BUFFER (by not putting things back)
@@ -121,6 +165,7 @@ def predict_async(frame,frm=None,args=None,frame_count=0):
             current_locations,current_names=[],[]
             # get locations every 2 frames
             if frame_count % 2 ==0:
+                frame_rsz = frame_rsz[:,:,::-1]  # to rgb
                 current_locations = face_locations(frame_rsz,
                                                     number_of_times_to_upsample=frm.upsample,
                                                     model=frm.model)
@@ -134,20 +179,25 @@ def predict_async(frame,frm=None,args=None,frame_count=0):
                     with ThreadPoolExecutor(max_workers=4) as executor:
                         current_names = executor.map(partial(get_names_from_encodings,frm=frm),current_encodings)
                     current_names = list(current_names)
-                    
+                
+                # PRED_BUFFER only put nonempty location list. There can be empty current_names list
                 PRED_BUFFER.put((current_locations,current_names))
+                
+                print(f'Name: {current_names}')
+                print('-'*20)
 
                 if len(current_names):
+                    # NAME_BUFFER always have nonempty name
                     update_dequeue(NAME_BUFFER,current_names)
                     
-                    pred_name,pred_time = get_single_prediction(args.max_size,args.min_pred)
+                    pred_name,pred_time = get_single_prediction(NAME_BUFFER,args.max_size,args.min_pred)
                     if pred_name is not None:
+                        FINAL_PREDS.put((pred_name,pred_time))
                         write_singlevalue_queue(CURRENT_PRED,(pred_name,pred_time))
-                        print(f'Name: {pred_name}, Time: {pred_time}')
 
 
     except Exception as e:
-        print('Something wrong')
+        print('Something wrong in making predictions')
         print(f'{e}')
 
 
@@ -158,21 +208,23 @@ def main(args,model_config):
     # Initiate and preprocess model
     resz = args.frame_resz # resolution to downsize
 
+    # initialize model and multiprocessing buffers
     frm = FaceRecModel(**model_config)
     frm.preprocess(args.enc_list)
-
-    FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER,CURRENT_PRED = Queue(),Queue(),Queue(maxsize=args.max_size),Queue()
-    pools = Pool(None, initializer=init_pool, initargs=(FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER,CURRENT_PRED))
+    FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER,CURRENT_PRED,FINAL_PREDS = Queue(),Queue(),Queue(maxsize=args.max_size),Queue(),Queue()
+    # lock = Lock()
+    pools = Pool(None, initializer=init_pool, initargs=(FRAME_BUFFER,PRED_BUFFER,NAME_BUFFER,CURRENT_PRED,FINAL_PREDS))
     
     # showing frame on 1 pool
     show_frame_aresult = pools.apply_async(show_frame_and_bb,args=(resz,)) # remember to have the comma here
     
-    # write/read 
+    # write/read files on 1 pool
+    # write_sheet_aresult = pools.apply_async(write_to_sheet,args=(frame_count,5,lock))
+    write_sheet_aresult = pools.apply_async(write_to_sheet,args=(5,))
 
     # camera stream
     stream = cv2.VideoCapture(args.source)
     async_result_list=[]
-
     while True:
         ret,frame = stream.read()
         if ret:
@@ -180,6 +232,7 @@ def main(args,model_config):
             # make prediction using the rest of the pools
             aresult = pools.apply_async(predict_async,args=(frame,frm,args,frame_count))
             async_result_list.append(aresult)
+
             frame_count+=1
             if frame_count > 1000:
                 frame_count=0
@@ -193,7 +246,12 @@ def main(args,model_config):
 
     # signal the "show" task to end by placing None in the queue
     FRAME_BUFFER.put(None)
+    PRED_BUFFER.put(None)
+    NAME_BUFFER.put(None)
+    FINAL_PREDS.put(None)
     show_frame_aresult.get()
+    write_sheet_aresult.get()
+
 
 
 

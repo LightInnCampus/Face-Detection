@@ -3,9 +3,9 @@ Model:
   upsample: 0
   model: 'hog'
   num_jitters: 1
-  thres: 0.43
+  thres: 0.43 # lower == stricter to predict from comparison
   enc_force_load: False
-  frame_skip: 12
+  frame_skip: 12 # should not be more than 30
   frame_resz: 0.8
 
 

@@ -127,15 +127,6 @@ class FaceRecModel:
         #   with face: 28.6, with eye blink: 13.9
         # => >50% improvement with upsample 0
 
-        # current_locations,current_names=[],[]
-        # if self.frame_count%self.frame_skip==0:
-        #     current_locations = self.get_locations(frame)
-        #     if len(current_locations):
-        #         current_encodings = self.get_encodings(frame,current_locations)
-        #         # current_names = [get_names_from_encodings(enc) for enc in current_encodings]
-        #         with ThreadPoolExecutor(max_workers=4) as executor:
-        #             current_names = executor.map(get_names_from_encodings,current_encodings)
-
         current_names=[]
         current_locations = self.get_locations(frame)
 
