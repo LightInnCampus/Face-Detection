@@ -75,12 +75,10 @@ def write_to_sheet(grace_minutes=5):
     while True:
         try:
             tmp = FINAL_PREDS.get()
-            print(f'FINAL_PREDS from write_to_sheet: {tmp}')
             current_name,current_time = tmp
             current_day,current_timestamp = current_time.split()
 
             pred_dict = read_singlevalue_queue(PRED_DICT,{})
-            print(pred_dict)
             # we won't add anything to PRED_DICT or sheet if:
             # it's still the same day, while his/her name is already in PRED_DICT, 
             #   and it hasn't been 5 minutes since his last timestamp
@@ -90,7 +88,7 @@ def write_to_sheet(grace_minutes=5):
                     if current_name in pred_dict:
                         prev_timestamp = pred_dict[current_name].split()[1]
                         if not is_time_delta_meq_than(prev_timestamp,current_timestamp,grace_minutes*60):
-                            print(f'{current_name} is still in grace period')
+                            # print(f'{current_name} is still in grace period')
                             continue
                 else:
                     # clear dictionary when it's a new day
@@ -101,10 +99,8 @@ def write_to_sheet(grace_minutes=5):
             # => add entry to PRED_DICT and sheet
             pred_dict[current_name] = current_time
             print('Write prediction to PRED_DICT and sheet')
-            print(pred_dict)
             write_singlevalue_queue(PRED_DICT,pred_dict)
             insert_to_spreadsheet(current_name,current_day,current_timestamp)
-            print('-'*20)
             
         except (KeyboardInterrupt, SystemExit):
             print("Exiting write_to_sheet")
@@ -202,20 +198,21 @@ def predict_async(frame,frm=None,args=None,frame_count=0):
                 # PRED_BUFFER only put nonempty location list. There can be empty current_names list
                 PRED_BUFFER.put((current_locations,current_names_and_times))
                 
-                # print(f'Name: {current_names_and_times}')
-                # print('-'*20)
+
 
                 if len(current_names_and_times):
+                    print(f'Raw prediction: {current_names_and_times}')
                     update_dequeue(NAMETIME_BUFFER,current_names_and_times)
                     
                     pred_name,pred_time = get_single_prediction(NAMETIME_BUFFER,args.max_size,args.min_pred)
                     if pred_name is not None:
+                        print(f'Cummulative prediction: {pred_name}, at {pred_time}')
                         FINAL_PREDS.put((pred_name,pred_time))
                         write_singlevalue_queue(CURRENT_PRED,(pred_name,pred_time))
 
 
     except Exception as e:
-        print('Something wrong in making predictions')
+        print('Something wrong in making async prediction')
         print(f'{e}')
 
 
