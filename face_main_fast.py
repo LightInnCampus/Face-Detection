@@ -80,6 +80,7 @@ def write_to_sheet(grace_minutes=5):
             current_day,current_timestamp = current_time.split()
 
             pred_dict = read_singlevalue_queue(PRED_DICT,{})
+            print(pred_dict)
             # we won't add anything to PRED_DICT or sheet if:
             # it's still the same day, while his/her name is already in PRED_DICT, 
             #   and it hasn't been 5 minutes since his last timestamp
@@ -89,16 +90,21 @@ def write_to_sheet(grace_minutes=5):
                     if current_name in pred_dict:
                         prev_timestamp = pred_dict[current_name].split()[1]
                         if not is_time_delta_meq_than(prev_timestamp,current_timestamp,grace_minutes*60):
-                            break
+                            print(f'{current_name} is still in grace period')
+                            continue
+                else:
+                    # clear dictionary when it's a new day
+                    pred_dict.clear()
 
             # At this point, it's either the new day, or this is a new name
             # or the name exists and he is checking in after the grace minutes
             # => add entry to PRED_DICT and sheet
-            pred_dict.clear()
             pred_dict[current_name] = current_time
-
+            print('Write prediction to PRED_DICT and sheet')
+            print(pred_dict)
             write_singlevalue_queue(PRED_DICT,pred_dict)
             insert_to_spreadsheet(current_name,current_day,current_timestamp)
+            print('-'*20)
             
         except (KeyboardInterrupt, SystemExit):
             print("Exiting write_to_sheet")
