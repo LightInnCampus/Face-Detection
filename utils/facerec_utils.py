@@ -5,8 +5,7 @@ import PIL.Image
 import dlib
 import numpy as np
 from PIL import ImageFile
-# import fastcore.parallel
-from concurrent.futures import ProcessPoolExecutor,ThreadPoolExecutor
+# from concurrent.futures import ProcessPoolExecutor,ThreadPoolExecutor
 
 try:
     import face_recognition_models

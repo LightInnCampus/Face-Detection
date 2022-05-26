@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 import cv2
 from pathlib import Path
@@ -98,9 +99,11 @@ def write_to_sheet(grace_minutes=5):
             # or the name exists and he is checking in after the grace minutes
             # => add entry to PRED_DICT and sheet
             pred_dict[current_name] = current_time
-            print('Write prediction to PRED_DICT and sheet')
+            print(f'Writing {current_name} to PRED_DICT ...')
             write_singlevalue_queue(PRED_DICT,pred_dict)
+            print(f'Writing {current_name} to sheet ...')
             insert_to_spreadsheet(current_name,current_day,current_timestamp)
+            print(f'Write successfully')
             
         except (KeyboardInterrupt, SystemExit):
             print("Exiting write_to_sheet")
@@ -259,9 +262,10 @@ def main(args,model_config):
                 break
         except (KeyboardInterrupt, SystemExit):
             print("Caught KeyboardInterrupt, terminating workers and ending programs...")
+            stream.release()
+            cv2.destroyAllWindows()
             pools.terminate()
             pools.join()
-            cv2.destroyAllWindows()
             break
 
     # wait for all the frame-putting tasks to complete:
