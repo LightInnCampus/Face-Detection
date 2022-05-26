@@ -99,11 +99,11 @@ def write_to_sheet(grace_minutes=5):
             # or the name exists and he is checking in after the grace minutes
             # => add entry to PRED_DICT and sheet
             pred_dict[current_name] = current_time
-            print(f'Writing {current_name} to PRED_DICT ...')
+            print(f'== Writing {current_name} to PRED_DICT ... ==')
             write_singlevalue_queue(PRED_DICT,pred_dict)
-            print(f'Writing {current_name} to sheet ...')
+            print(f'== Writing {current_name} to sheet ...==')
             insert_to_spreadsheet(current_name,current_day,current_timestamp)
-            print(f'Write successfully')
+            print(f'===== Write successfully =====')
             
         except (KeyboardInterrupt, SystemExit):
             print("Exiting write_to_sheet")
@@ -209,7 +209,7 @@ def predict_async(frame,frm=None,args=None,frame_count=0):
                     
                     pred_name,pred_time = get_single_prediction(NAMETIME_BUFFER,args.max_size,args.min_pred)
                     if pred_name is not None:
-                        print(f'Cummulative prediction: {pred_name}, at {pred_time}')
+                        print(f'==> Cummulative prediction: {pred_name}, at {pred_time}')
                         FINAL_PREDS.put((pred_name,pred_time))
                         write_singlevalue_queue(CURRENT_PRED,(pred_name,pred_time))
 
