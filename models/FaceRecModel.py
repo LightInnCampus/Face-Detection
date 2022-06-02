@@ -9,8 +9,8 @@ import re
 from utils.facerec_utils import *
 
 
-DATA = Path('./Database/')
-ENCODINGS = Path('./Weights/FaceRec_Encs/')
+DATA_PATH = Path('./Database/')
+ENCODING_PATH = Path('./Weights/FaceRec_Encs/')
 
 class FaceRecModel:
     def __init__(self,enc_model_size='large',frame_resz=0.2,upsample=1,
@@ -46,22 +46,22 @@ class FaceRecModel:
         self.face_encs,self.face_names=[],[]
 
         # check path existence:
-        if not DATA.exist():
-            DATA.mkdir(parents=True)
+        if not DATA_PATH.exists():
+            DATA_PATH.mkdir(parents=True)
             raise Exception(f"No images in database found. Please insert images in {str(DATA)}")
-        if not ENCODING.exist():
-            ENCODING.mkdir(parents=True)
+        if not ENCODING_PATH.exists():
+            ENCODING_PATH.mkdir(parents=True)
         
         # empty database
-        if self.enc_force_load or len(list(ENCODINGS.glob('**/*.npy')))==0:
+        if self.enc_force_load or len(list(ENCODING_PATH.glob('**/*.npy')))==0:
             # remove all encodings
-            print(f'Deleting all encodings in {ENCODINGS}')
-            for f in ENCODINGS.glob('**/*.npy'):
+            print(f'Deleting all encodings in {ENCODING_PATH}')
+            for f in ENCODING_PATH.glob('**/*.npy'):
                 try: f.unlink()
                 except OSError as e:
                     print(f'Error deleting {f}: {e}')
 
-            files = [p for p in DATA.glob('**/*') if p.suffix in {'.png','.jpg','.jpeg'}]
+            files = [p for p in DATA_PATH.glob('**/*') if p.suffix in {'.png','.jpg','.jpeg'}]
             for f in files:
                 print(f'Getting encodings from {f}...')
                 img = face_recognition.load_image_file(f)
@@ -69,29 +69,29 @@ class FaceRecModel:
                 name = Path(f).stem.lower()
 
                 # write to encoding directory
-                np.save(ENCODINGS/f'{name}.npy',enc)
+                np.save(ENCODING_PATH/f'{name}.npy',enc)
                 self.face_encs.append(enc)
                 self.face_names.append(name)   
 
         else:
-            for f in ENCODINGS.glob('**/*.npy'):
+            for f in ENCODING_PATH.glob('**/*.npy'):
                 print(f'Loading encodings from {f}...')
                 name = Path(f).stem.lower()
-                enc = np.load(ENCODINGS/f'{name}.npy')
+                enc = np.load(ENCODING_PATH/f'{name}.npy')
                 self.face_encs.append(enc)
                 self.face_names.append(name)
             # Get encodings from extra list
             for name in enc_list.split():
                 name = name.strip().lower()
                 print(f'Get extra encodings for {name}...')
-                f = [p for p in DATA.glob(f'**/{name}.*') if p.suffix in {'.png','.jpg','.jpeg'}]
+                f = [p for p in DATA_PATH.glob(f'**/{name}.*') if p.suffix in {'.png','.jpg','.jpeg'}]
                 if len(f)==0 or len(f)>1:
                     print(f'Error getting encodings for {name}: too many images or image not found')
                     continue
                 img = face_recognition.load_image_file(f[0])
                 enc = list(self.get_encodings(img))[0]
                 # write to encoding directory
-                np.save(ENCODINGS/f'{name}.npy',enc)
+                np.save(ENCODING_PATH/f'{name}.npy',enc)
                 self.face_encs.append(enc)
                 self.face_names.append(name) 
 
