@@ -1,10 +1,13 @@
 
+from concurrent.futures import ThreadPoolExecutor
 from http.client import EXPECTATION_FAILED
+from tarfile import ENCODING
 import face_recognition
 from pathlib import Path
 import numpy as np
 import re
 from utils.facerec_utils import *
+
 
 DATA = Path('./Database/')
 ENCODINGS = Path('./Weights/FaceRec_Encs/')
@@ -42,6 +45,13 @@ class FaceRecModel:
         '''
         self.face_encs,self.face_names=[],[]
 
+        # check path existence:
+        if not DATA.exist():
+            DATA.mkdir(parents=True)
+            raise Exception(f"No images in database found. Please insert images in {str(DATA)}")
+        if not ENCODING.exist():
+            ENCODING.mkdir(parents=True)
+        
         # empty database
         if self.enc_force_load or len(list(ENCODINGS.glob('**/*.npy')))==0:
             # remove all encodings
