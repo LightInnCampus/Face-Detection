@@ -268,8 +268,7 @@ def main(args,model_config):
             pools.join()
             break
 
-    # wait for all the frame-putting tasks to complete:
-    
+    ## wait for all the frame-putting tasks to complete:
     # for f in async_result_list:
     #     f.get() # Return the result when it arrives
     # FRAME_BUFFER.put(None)

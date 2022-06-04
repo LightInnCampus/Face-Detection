@@ -48,7 +48,7 @@ class FaceRecModel:
         # check path existence:
         if not DATA_PATH.exists():
             DATA_PATH.mkdir(parents=True)
-            raise Exception(f"No images in database found. Please insert images in {str(DATA)}")
+            raise Exception(f"No images in database found. Please insert images in {str(DATA_PATH)}")
         if not ENCODING_PATH.exists():
             ENCODING_PATH.mkdir(parents=True)
         

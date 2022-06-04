@@ -1,10 +1,10 @@
 Model:
-  enc_model_size: 'large'
-  upsample: 0
+  enc_model_size: 'large' # 'small' (use 5 face-landmark points for pose prediction/face descriptor) or 'large' (use 64 points, more accurate) 
+  upsample: 0 # higher == detect smaller faces, but slower due to image pyramid calculation
   model: 'hog'
   num_jitters: 1
   thres: 0.43 # lower == stricter to make prediction from comparison
-  enc_force_load: False
+  enc_force_load: False # True => force recomputing face encoding database
   frame_skip: 12 # higher frame skip == faster, but longer time for a prediction. Lower frame skip == race condition for multiprocessing (noticable lag of bbox)
   frame_resz: 0.78 # lower == faster. But model might not get a good resolution of image
 
